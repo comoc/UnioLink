@@ -1,37 +1,41 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using Windows.Networking.Sockets;
-using Windows.Storage.Streams;
+using WebSocketSharp;
+using WebSocketSharp.Server;
+
 
 // References
 // https://so-zou.jp/software/tech/programming/c-sharp/thread/thread-safe-call.htm
 // https://ameblo.jp/tubutappuri-san/entry-12598949900.html
 // https://qiita.com/ta-yamaoka/items/a7ff1d9651310ade4e76
 // https://qiita.com/FumiyaHr/items/13de3dcbd9b81d9d27f0
+// https://qiita.com/riyosy/items/5789ccdeee644b34a743
 namespace UnioLink
 {
     public partial class Form1 : Form
     {
-        private MessageWebSocket messageWebSocket;
-
-        private static string WebSocketUri = "ws://127.0.0.1:12345";
+        private WebSocketServer server;
+        private int webSocketServerPort = 12345;
 
         public Form1()
         {
             InitializeComponent();
-            Connect();
+
+            server = new WebSocketServer(webSocketServerPort);
+            server.AddWebSocketService<ExWebSocketBehavior>("/");
+            server.Start();
         }
 
-        delegate void SetTextCallback(string text);
+        protected override void OnClosed(EventArgs e)
+        {
+            if (server != null)
+                server.Stop();
+        }
+
+            delegate void SetTextCallback(string text);
 
         private void SetText(string text)
         {
@@ -44,9 +48,7 @@ namespace UnioLink
                 labelToioStatus.Invoke(delegateMethod, new object[] { text });
             }
             else
-            {
                 labelToioStatus.Text = text;
-            }
         }
 
         private void NewToioFound()
@@ -61,65 +63,34 @@ namespace UnioLink
             ToioBridge.ToioDeviceManager.Instance.Search(3000, NewToioFound);
         }
 
-        private void Connect()
+    }
+
+    public class ExWebSocketBehavior : WebSocketBehavior
+    {
+        public static List<ExWebSocketBehavior> clientList = new List<ExWebSocketBehavior>();
+        static int globalSeq = 0;
+        int seq;
+
+        protected override void OnOpen()
         {
-            Debug.WriteLine("OnConnect()");
+            globalSeq++;
+            this.seq = globalSeq;
+            clientList.Add(this);
+            Debug.WriteLine("Seq" + this.seq + " Login. (" + this.ID + ")");
 
-            messageWebSocket = new MessageWebSocket();
+            string welcomeMessage = "{\"UnioLink\":\"Connected\"}";
+            Send(welcomeMessage);
 
-            //In this case we will be sending/receiving a string so we need to set the MessageType to Utf8.
-            messageWebSocket.Control.MessageType = SocketMessageType.Utf8;
-
-            //Add the MessageReceived event handler.
-            messageWebSocket.MessageReceived += MessageWebSocket_MessageReceived;
-
-            //Add the Closed event handler.
-            messageWebSocket.Closed += MessageWebSocket_Closed;
-
-            Uri serverUri = new Uri(WebSocketUri);
-
-            try
-            {
-                Task.Run(async () => {
-                    //Connect to the server.
-                    Debug.WriteLine("Connect to the server...." + serverUri.ToString());
-                    await Task.Run(async () =>
-                    {
-                        await messageWebSocket.ConnectAsync(serverUri);
-                        Debug.WriteLine("ConnectAsync OK");
-
-                        //await WebSock_SendMessage(messageWebSocket, "Connect Start");
-
-                        //= JsonSerializer.Serialize("");
-                        await WebSock_SendMessage(messageWebSocket, "C#");
-                    });
-
-                });
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("error : " + ex.ToString());
-
-                //Add code here to handle any exceptions
-            }
-
+            //foreach (var client in clientList)
+            //{
+            //    client.Send(welcomeMessage);
+            //}
         }
 
-        private void MessageWebSocket_Closed(IWebSocket sender, WebSocketClosedEventArgs args)
+        protected override void OnMessage(MessageEventArgs e)
         {
-            Debug.WriteLine("MessageWebSocket_Closed()");
-
-            // TODO
-            // try reconnect
-        }
-
-        private void MessageWebSocket_MessageReceived(MessageWebSocket sender, MessageWebSocketMessageReceivedEventArgs args)
-        {
-            DataReader messageReader = args.GetDataReader();
-            messageReader.UnicodeEncoding = Windows.Storage.Streams.UnicodeEncoding.Utf8;
-            string messageString = messageReader.ReadString(messageReader.UnconsumedBufferLength);
+            string messageString = e.Data;
             Debug.WriteLine("messageString : " + messageString);
-
             if (messageString.Length > 0 && messageString[0] == '{')
             {
                 try
@@ -139,26 +110,21 @@ namespace UnioLink
                         }
                     }
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {
-                    Debug.WriteLine(e.ToString());
+                    Debug.WriteLine(ex.ToString());
                 }
-
             }
-
-            //Task.Run(async () =>
-            //{
-            //    await Task.Delay(100);
-            //});
         }
 
-        private async Task WebSock_SendMessage(MessageWebSocket webSock, string message)
+        protected override void OnClose(CloseEventArgs e)
         {
-            Debug.WriteLine("WebSock_SendMessage : " + message);
-
-            DataWriter messageWriter = new DataWriter(webSock.OutputStream);
-            messageWriter.WriteString(message);
-            await messageWriter.StoreAsync();
+            //Debug.WriteLine("Seq" + this.seq + " Logout. (" + this.ID + ")");
+            //clientList.Remove(this);
+            //foreach (var client in clientList)
+            //{
+            //    client.Send("Seq:" + seq + " Logout.");
+            //}
         }
     }
 }
@@ -200,29 +166,6 @@ namespace UniToio
             }
 
             return data;
-        }
-    }
-
-    public class motorControlData
-    {
-        public static readonly string Uuid = "10B20102-5B3B-4571-9508-CF3EFCD7BBAE";
-        public static readonly int DataLength = 7;
-
-        public static readonly byte Type = 0x01;
-        public static readonly byte LeftId = 0x01;
-        public static readonly byte RightId = 0x02;
-
-        public string uuid = Uuid;
-        public byte[] data;
-
-        public motorControlData() { }
-
-        public motorControlData(bool isLeftForward, byte leftSpeed, bool isRightForward, byte rightSpeed)
-        {
-            uuid = Uuid;
-            data = new byte[7] {Type,
-                LeftId, (byte)(isLeftForward ? 0x01 : 0x02), leftSpeed,
-                RightId, (byte)(isRightForward ? 0x01 : 0x02), rightSpeed};
         }
     }
 }
