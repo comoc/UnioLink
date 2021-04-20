@@ -51,11 +51,15 @@ namespace UnioLink
                 labelToioStatus.Text = text;
         }
 
-        private void NewToioFound()
+        private void NewToioFound(ToioBridge.Toio toio)
         {
             string msg = $"Toio count: {ToioBridge.ToioDeviceManager.Instance.GetToioCount()}";
             SetText(msg);
-            
+
+            string json = "{\"serial\":" + toio.SerialNumber + "}";
+            server.WebSocketServices.Broadcast(json);
+
+            toio.onValueChanged += OnValueChanged;
         }
 
         private void buttonConnect_Click(object sender, EventArgs e)
@@ -63,6 +67,18 @@ namespace UnioLink
             ToioBridge.ToioDeviceManager.Instance.Search(3000, NewToioFound);
         }
 
+        private void OnValueChanged(int serial, string uuid, byte[] data)
+        {
+            UniToio.Data d = new UniToio.Data();
+            d.serial = serial;
+            d.uuid = uuid;
+            d.data = data;
+            UniToio.NetData rd = UniToio.DataConverter.TryConvert(d);
+            string json = JsonConvert.SerializeObject(rd);
+
+            Debug.WriteLine("OnValueChanged: " + json);
+            server.WebSocketServices.Broadcast(json);
+        }
     }
 
     public class ExWebSocketBehavior : WebSocketBehavior
@@ -95,10 +111,10 @@ namespace UnioLink
             {
                 try
                 {
-                    UniToio.RawData rawData = JsonConvert.DeserializeObject<UniToio.RawData>(messageString);
-                    if (rawData != null)
+                    UniToio.NetData netData = JsonConvert.DeserializeObject<UniToio.NetData>(messageString);
+                    if (netData != null)
                     {
-                        UniToio.Data data = UniToio.DataConverter.TryConvert(rawData);
+                        UniToio.Data data = UniToio.DataConverter.TryConvert(netData);
                         if (data != null)
                         {
                             for (int i = 0; i < ToioBridge.ToioDeviceManager.Instance.GetToioCount(); i++)
@@ -133,26 +149,29 @@ namespace UnioLink
 namespace UniToio
 {
     [Serializable]
-    public class RawData
+    public class NetData
     {
+        public int serial;
         public string uuid;
         public int[] data;
     }
 
     public class Data
     {
+        public int serial;
         public string uuid;
         public byte[] data;
     }
 
     public class DataConverter
     {
-        public static Data TryConvert(RawData rd)
+        public static Data TryConvert(NetData rd)
         {
             if (rd == null || rd.uuid == null || rd.uuid == "" || rd.data == null)
                 return null;
 
             Data data = new Data();
+            data.serial = rd.serial;
             data.uuid = rd.uuid.ToLower();
             data.data = new byte[rd.data.Length];
             for (int i = 0; i < rd.data.Length; i++)
@@ -163,6 +182,23 @@ namespace UniToio
                     rd.data[i] = 255;
 
                 data.data[i] = (byte)rd.data[i];
+            }
+
+            return data;
+        }
+
+        public static NetData TryConvert(Data rd)
+        {
+            if (rd == null || rd.uuid == null || rd.uuid == "" || rd.data == null)
+                return null;
+
+            NetData data = new NetData();
+            data.serial = rd.serial;
+            data.uuid = rd.uuid.ToUpper();
+            data.data = new int[rd.data.Length];
+            for (int i = 0; i < rd.data.Length; i++)
+            {
+                data.data[i] = rd.data[i];
             }
 
             return data;

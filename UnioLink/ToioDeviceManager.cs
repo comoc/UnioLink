@@ -28,6 +28,9 @@ namespace ToioBridge
         public static readonly Guid CharacteristicUUID_SoundControl = new Guid("10B20104-5B3B-4571-9508-CF3EFCD7BBAE");
         public static readonly Guid CharacteristicUUID_Configuration = new Guid("10B201FF-5B3B-4571-9508-CF3EFCD7BBAE");
 
+        private static int serialNumberCounter = 1;
+
+        public int SerialNumber { private set; get; }
         public ulong Address { private set; get; }
 
         // Service
@@ -83,6 +86,9 @@ namespace ToioBridge
 
         public Toio(ulong address, GattDeviceService service)
         {
+            SerialNumber = serialNumberCounter;
+            serialNumberCounter++;
+
             Address = address;
             Service = service;
 
@@ -158,9 +164,14 @@ namespace ToioBridge
             task.Wait();
         }
 
+        public delegate void OnValueChanged(int serial, string uuid, byte[] data);
+        public event OnValueChanged onValueChanged;
+
         private void CharacteristicButtonInformation_ValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
         {
             byte[] data = ReadDataOnValueChanged(args);
+            onValueChanged(SerialNumber, sender.Uuid.ToString(), data);
+
             ButtonID = data[0];
             ButtonStatus = data[1];
 
@@ -170,6 +181,8 @@ namespace ToioBridge
         private void CharacteristicMotionOrMagneticSensorInformation_ValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
         {
             byte[] data = ReadDataOnValueChanged(args);
+            onValueChanged(SerialNumber, sender.Uuid.ToString(), data);
+
             if (data[0] == MotionSensorInformationType)
             {
                 MotionSensorLevelDetection = data[1];
@@ -190,6 +203,8 @@ namespace ToioBridge
         private void CharacteristicIDInformation_ValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
         {
             byte[] data = ReadDataOnValueChanged(args);
+            onValueChanged(SerialNumber, sender.Uuid.ToString(), data);
+
             IDPositionID = data[0];
             IDCubeCenterX = BitConverter.ToUInt16(data, 1);
             IDCubeCenterY = BitConverter.ToUInt16(data, 3);
@@ -203,7 +218,10 @@ namespace ToioBridge
 
         private void CharacteristicBatteryInformation_ValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
         {
-            BatteryLife = ReadDataOnValueChanged(args)[0];
+            byte[] data = ReadDataOnValueChanged(args);
+            onValueChanged(SerialNumber, sender.Uuid.ToString(), data);
+
+            BatteryLife = data[0];
         }
 
         private byte[] ReadDataOnValueChanged(GattValueChangedEventArgs args)
@@ -325,7 +343,7 @@ namespace ToioBridge
         private static ToioDeviceManager instance = null;
         private static readonly object lockObj = new object();
 
-        public delegate void NewlyFound();
+        public delegate void NewlyFound(Toio toio);
         private NewlyFound newlyFound = null;
 
         private ToioDeviceManager()
@@ -392,7 +410,7 @@ namespace ToioBridge
                             }
 
                             if (newlyFound != null)
-                                newlyFound();
+                                newlyFound(toio);
                         }
                         //var services = await bluetoothLeDevice.GetGattServicesForUuidAsync(Toio.ServiceUUID);
 
