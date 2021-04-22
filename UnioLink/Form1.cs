@@ -65,7 +65,7 @@ namespace UnioLink
             _timer = null;
         }
 
-        delegate void SetTextCallback(string text);
+        private delegate void SetTextCallback(string text);
 
         private void SetText(string text)
         {
@@ -95,13 +95,8 @@ namespace UnioLink
             clientList.Add(this);
             Debug.WriteLine("Seq" + this.seq + " Login. (" + this.ID + ")");
 
-            string welcomeMessage = "{\"UnioLink\":\"Connected\"}";
-            Send(welcomeMessage);
-
-            //foreach (var client in clientList)
-            //{
-            //    client.Send(welcomeMessage);
-            //}
+            string msg = "{\"UnioLink\":\"Connected\"}";
+            Send(msg);
         }
 
         protected override void OnMessage(MessageEventArgs e)
@@ -120,7 +115,7 @@ namespace UnioLink
                             ToioBridge.ToioDeviceManager.Instance.Search(3000, NewToioFound);
                             return;
                         }
-                        UniToio.Data data = UniToio.DataConverter.TryConvert(netData);
+                        UniToio.Data data = UniToio.DataConverter.Convert(netData);
                         if (data != null)
                         {
                             for (int i = 0; i < ToioBridge.ToioDeviceManager.Instance.GetToioCount(); i++)
@@ -141,12 +136,8 @@ namespace UnioLink
 
         protected override void OnClose(CloseEventArgs e)
         {
-            //Debug.WriteLine("Seq" + this.seq + " Logout. (" + this.ID + ")");
-            //clientList.Remove(this);
-            //foreach (var client in clientList)
-            //{
-            //    client.Send("Seq:" + seq + " Logout.");
-            //}
+            string msg = "{\"UnioLink\":\"Close\"}";
+            Send(msg);
         }
 
         private void NewToioFound(ToioBridge.Toio toio)
@@ -167,7 +158,7 @@ namespace UnioLink
             d.serial = serial;
             d.uuid = uuid;
             d.data = data;
-            UniToio.NetData rd = UniToio.DataConverter.TryConvert(d);
+            UniToio.NetData rd = UniToio.DataConverter.Convert(d);
             string json = JsonConvert.SerializeObject(rd);
 
             Debug.WriteLine("OnValueChanged: " + json);
@@ -195,7 +186,7 @@ namespace UniToio
 
     public class DataConverter
     {
-        public static Data TryConvert(NetData rd)
+        public static Data Convert(NetData rd)
         {
             if (rd == null || rd.uuid == null || rd.uuid == "" || rd.data == null)
                 return null;
@@ -217,7 +208,7 @@ namespace UniToio
             return data;
         }
 
-        public static NetData TryConvert(Data rd)
+        public static NetData Convert(Data rd)
         {
             if (rd == null || rd.uuid == null || rd.uuid == "" || rd.data == null)
                 return null;
