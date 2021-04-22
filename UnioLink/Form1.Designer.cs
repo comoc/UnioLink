@@ -28,28 +28,17 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.buttonConnect = new System.Windows.Forms.Button();
             this.labelToioStatus = new System.Windows.Forms.Label();
             this.SuspendLayout();
-            // 
-            // buttonConnect
-            // 
-            this.buttonConnect.Location = new System.Drawing.Point(115, 102);
-            this.buttonConnect.Name = "buttonConnect";
-            this.buttonConnect.Size = new System.Drawing.Size(141, 81);
-            this.buttonConnect.TabIndex = 0;
-            this.buttonConnect.Text = "Connect";
-            this.buttonConnect.UseVisualStyleBackColor = true;
-            this.buttonConnect.Click += new System.EventHandler(this.buttonConnect_Click);
             // 
             // labelToioStatus
             // 
             this.labelToioStatus.AutoSize = true;
-            this.labelToioStatus.Location = new System.Drawing.Point(334, 132);
+            this.labelToioStatus.Location = new System.Drawing.Point(12, 9);
             this.labelToioStatus.Name = "labelToioStatus";
-            this.labelToioStatus.Size = new System.Drawing.Size(145, 21);
+            this.labelToioStatus.Size = new System.Drawing.Size(68, 21);
             this.labelToioStatus.TabIndex = 1;
-            this.labelToioStatus.Text = "labelToioStatus";
+            this.labelToioStatus.Text = "Status";
             // 
             // Form1
             // 
@@ -57,7 +46,6 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
             this.Controls.Add(this.labelToioStatus);
-            this.Controls.Add(this.buttonConnect);
             this.Name = "Form1";
             this.Text = "Form1";
             this.ResumeLayout(false);
@@ -66,8 +54,6 @@
         }
 
         #endregion
-
-        private System.Windows.Forms.Button buttonConnect;
         private System.Windows.Forms.Label labelToioStatus;
     }
 }

@@ -19,6 +19,7 @@ namespace UnioLink
     {
         private WebSocketServer server;
         private int webSocketServerPort = 12345;
+        private Timer _timer = null;
 
         public Form1()
         {
@@ -27,15 +28,44 @@ namespace UnioLink
             server = new WebSocketServer(webSocketServerPort);
             server.AddWebSocketService<ExWebSocketBehavior>("/");
             server.Start();
+
+            StartTimer();
         }
 
         protected override void OnClosed(EventArgs e)
         {
+            StopTimer();
+
             if (server != null)
                 server.Stop();
         }
 
-            delegate void SetTextCallback(string text);
+        private void StartTimer()
+        {
+            Timer timer = new Timer();
+            timer.Tick += new EventHandler(TickHandler);
+            timer.Interval = 1000;
+            timer.Start();
+            _timer = timer;
+        }
+
+        private void TickHandler(object sender, EventArgs e)
+        {
+            string msg = $"Toio count: {ToioBridge.ToioDeviceManager.Instance.GetToioCount()}";
+            SetText(msg);
+        }
+
+        private void StopTimer()
+        {
+            if (_timer == null)
+            {
+                return;
+            }
+            _timer.Stop();
+            _timer = null;
+        }
+
+        delegate void SetTextCallback(string text);
 
         private void SetText(string text)
         {
@@ -49,35 +79,6 @@ namespace UnioLink
             }
             else
                 labelToioStatus.Text = text;
-        }
-
-        private void NewToioFound(ToioBridge.Toio toio)
-        {
-            string msg = $"Toio count: {ToioBridge.ToioDeviceManager.Instance.GetToioCount()}";
-            SetText(msg);
-
-            string json = "{\"serial\":" + toio.SerialNumber + "}";
-            server.WebSocketServices.Broadcast(json);
-
-            toio.onValueChanged += OnValueChanged;
-        }
-
-        private void buttonConnect_Click(object sender, EventArgs e)
-        {
-            ToioBridge.ToioDeviceManager.Instance.Search(3000, NewToioFound);
-        }
-
-        private void OnValueChanged(int serial, string uuid, byte[] data)
-        {
-            UniToio.Data d = new UniToio.Data();
-            d.serial = serial;
-            d.uuid = uuid;
-            d.data = data;
-            UniToio.NetData rd = UniToio.DataConverter.TryConvert(d);
-            string json = JsonConvert.SerializeObject(rd);
-
-            Debug.WriteLine("OnValueChanged: " + json);
-            server.WebSocketServices.Broadcast(json);
         }
     }
 
@@ -114,6 +115,11 @@ namespace UnioLink
                     UniToio.NetData netData = JsonConvert.DeserializeObject<UniToio.NetData>(messageString);
                     if (netData != null)
                     {
+                        if (netData.uuid == "" && (netData.data == null || netData.data.Length == 0)) // Connect
+                        {
+                            ToioBridge.ToioDeviceManager.Instance.Search(3000, NewToioFound);
+                            return;
+                        }
                         UniToio.Data data = UniToio.DataConverter.TryConvert(netData);
                         if (data != null)
                         {
@@ -142,13 +148,37 @@ namespace UnioLink
             //    client.Send("Seq:" + seq + " Logout.");
             //}
         }
+
+        private void NewToioFound(ToioBridge.Toio toio)
+        {
+            string msg = $"Toio count: {ToioBridge.ToioDeviceManager.Instance.GetToioCount()}";
+            //SetText(msg);
+            Debug.WriteLine(msg);
+
+            string json = "{\"serial\":" + toio.SerialNumber + "}";
+            Sessions.Broadcast(json);
+
+            toio.onValueChanged += OnValueChanged;
+        }
+
+        private void OnValueChanged(int serial, string uuid, byte[] data)
+        {
+            UniToio.Data d = new UniToio.Data();
+            d.serial = serial;
+            d.uuid = uuid;
+            d.data = data;
+            UniToio.NetData rd = UniToio.DataConverter.TryConvert(d);
+            string json = JsonConvert.SerializeObject(rd);
+
+            Debug.WriteLine("OnValueChanged: " + json);
+            Sessions.Broadcast(json);
+        }
     }
 }
 
 
 namespace UniToio
 {
-    [Serializable]
     public class NetData
     {
         public int serial;

@@ -48,27 +48,9 @@ namespace ToioBridge
 
         private List<GattCharacteristic> characteristics = new List<GattCharacteristic>();
 
-        public byte IDPositionID { private set; get; }
-        public ushort IDCubeCenterX { private set; get; }
-        public ushort IDCubeCenterY { private set; get; }
-        public ushort IDCubeAngle { private set; get; }
-        public ushort IDSensorX { private set; get; }
-        public ushort IDSensorY { private set; get; }
-        public ushort IDSensorAngle { private set; get; }
-
-        public static readonly byte MotionSensorInformationRequestType = 0x81;//{ private set; get; }
-        public static readonly byte MotionSensorInformationType = 0x01;//{ private set; get; }
-        public byte MotionSensorLevelDetection { private set; get; }
-        public byte MotionSensorCollisionDetection { private set; get; }
-        public byte MotionSensorDoubleClickDetection { private set; get; }
-        public byte MotionSensorPostureDetection { private set; get; }
-
-        public static readonly byte MagneticSensorInformationRequestType = 0x82;//{ private set; get; }
-        public static readonly byte MagneticSensorInformationType = 0x02;//{ private set; get; }
-        public byte MagneticSensorStatus { private set; get; }
-
-        public byte ButtonID { private set; get; }
-        public byte ButtonStatus { private set; get; }
+        public static readonly byte MotionSensorInformationType = 0x01;
+        public static readonly byte MagneticSensorInformationType = 0x02;
+        public static readonly byte PostureAngleSensorInformationType = 0x03;
 
         public byte BatteryLife { private set; get; }
 
@@ -170,10 +152,10 @@ namespace ToioBridge
         private void CharacteristicButtonInformation_ValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
         {
             byte[] data = ReadDataOnValueChanged(args);
-            onValueChanged(SerialNumber, sender.Uuid.ToString(), data);
+            onValueChanged?.Invoke(SerialNumber, sender.Uuid.ToString(), data);
 
-            ButtonID = data[0];
-            ButtonStatus = data[1];
+            byte ButtonID = data[0];
+            byte ButtonStatus = data[1];
 
             Debug.WriteLine($"{System.Reflection.MethodBase.GetCurrentMethod().Name} ButtonID:{ButtonID}, ButtonStatus:{ButtonStatus}");
         }
@@ -181,37 +163,44 @@ namespace ToioBridge
         private void CharacteristicMotionOrMagneticSensorInformation_ValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
         {
             byte[] data = ReadDataOnValueChanged(args);
-            onValueChanged(SerialNumber, sender.Uuid.ToString(), data);
+            onValueChanged?.Invoke(SerialNumber, sender.Uuid.ToString(), data);
 
             if (data[0] == MotionSensorInformationType)
             {
-                MotionSensorLevelDetection = data[1];
-                MotionSensorCollisionDetection = data[2];
-                MotionSensorDoubleClickDetection = data[3];
-                MotionSensorPostureDetection = data[4];
+                byte MotionSensorLevelDetection = data[1];
+                byte MotionSensorCollisionDetection = data[2];
+                byte MotionSensorDoubleClickDetection = data[3];
+                byte MotionSensorPostureDetection = data[4];
 
                 Debug.WriteLine($"{System.Reflection.MethodBase.GetCurrentMethod().Name} MotionSensorInformationType:{MotionSensorInformationType}, MotionSensorLevelDetection:{MotionSensorLevelDetection}, MotionSensorCollisionDetection:{MotionSensorCollisionDetection}, MotionSensorDoubleClickDetection:{MotionSensorDoubleClickDetection}, MotionSensorPostureDetection:{MotionSensorPostureDetection}");
             }
             else if (data[0] == MagneticSensorInformationType)
             {
-                MagneticSensorStatus = data[1];
+                byte MagneticSensorStatus = data[1];
 
                 Debug.WriteLine($"{System.Reflection.MethodBase.GetCurrentMethod().Name} MagneticSensorInformationType:{MagneticSensorInformationType}, MagneticSensorStatus:{MagneticSensorStatus}");
+            }
+
+            else if (data[0] == PostureAngleSensorInformationType)
+            {
+                byte sMagneticSensorStatus = data[1];
+
+                Debug.WriteLine($"{System.Reflection.MethodBase.GetCurrentMethod().Name} PostureAngleSensorInformationType:{PostureAngleSensorInformationType}, data:{data}");
             }
         }
 
         private void CharacteristicIDInformation_ValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
         {
             byte[] data = ReadDataOnValueChanged(args);
-            onValueChanged(SerialNumber, sender.Uuid.ToString(), data);
+            onValueChanged?.Invoke(SerialNumber, sender.Uuid.ToString(), data);
 
-            IDPositionID = data[0];
-            IDCubeCenterX = BitConverter.ToUInt16(data, 1);
-            IDCubeCenterY = BitConverter.ToUInt16(data, 3);
-            IDCubeAngle = BitConverter.ToUInt16(data, 5);
-            IDSensorX = BitConverter.ToUInt16(data, 7);
-            IDSensorY = BitConverter.ToUInt16(data, 9);
-            IDSensorAngle = BitConverter.ToUInt16(data, 11);
+            byte IDPositionID = data[0];
+            ushort IDCubeCenterX = BitConverter.ToUInt16(data, 1);
+            ushort IDCubeCenterY = BitConverter.ToUInt16(data, 3);
+            ushort IDCubeAngle = BitConverter.ToUInt16(data, 5);
+            ushort IDSensorX = BitConverter.ToUInt16(data, 7);
+            ushort IDSensorY = BitConverter.ToUInt16(data, 9);
+            ushort IDSensorAngle = BitConverter.ToUInt16(data, 11);
 
             Debug.WriteLine($"{System.Reflection.MethodBase.GetCurrentMethod().Name} IDPositionID:{IDPositionID}, IDCubeCenterX:{IDCubeCenterX}, IDCubeCenterY:{IDCubeCenterY}, IDCubeCenterX:{IDCubeCenterX}, IDCubeAngle:{IDCubeAngle}, IDSensorX:{IDSensorX}, IDSensorY:{IDSensorY}, IDSensorAngle:{IDSensorAngle}");
         }
@@ -219,7 +208,7 @@ namespace ToioBridge
         private void CharacteristicBatteryInformation_ValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
         {
             byte[] data = ReadDataOnValueChanged(args);
-            onValueChanged(SerialNumber, sender.Uuid.ToString(), data);
+            onValueChanged?.Invoke(SerialNumber, sender.Uuid.ToString(), data);
 
             BatteryLife = data[0];
         }
@@ -259,34 +248,6 @@ namespace ToioBridge
 
             return BatteryLife;
         }
-
-
-        //public void MotorControl(bool isForwardLeft, byte speedLeft, bool isForwardRight, byte speedRight)
-        //{
-        //    const byte MotorControlType = 0x01;
-        //    const byte MortorTargetIDLeft = 0x01;
-        //    const byte MortorTargetIDRight = 0x02;
-        //    byte[] data = new byte[7]
-        //    {
-        //        MotorControlType, MortorTargetIDLeft, (isForwardLeft ? (byte)0x01 : (byte)0x02), speedLeft, MortorTargetIDRight, (isForwardRight ? (byte)0x01 : (byte)0x02), speedRight
-        //    };
-        //    var writer = new DataWriter();
-        //    writer.WriteBytes(data);
-        //    Task task = Task.Run(async () =>
-        //    {
-        //        GattCommunicationStatus result = await CharacteristicMotorControl.WriteValueAsync(writer.DetachBuffer());
-        //        if (result == GattCommunicationStatus.Success)
-        //        {
-        //            // Successfully wrote to device
-        //            Debug.WriteLine("MotorControl Success");
-        //        }
-        //        else
-        //        {
-        //            Debug.WriteLine("MotorControl Failure");
-        //        }
-        //    });
-        //    task.Wait();
-        //}
 
         public byte[] Read(string uuid)
         {
@@ -378,9 +339,12 @@ namespace ToioBridge
 
         private void Watcher_Received(BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementReceivedEventArgs args)
         {
-            if (toioList.Count(t => t.Address == args.BluetoothAddress) > 0)
+            lock (lockObj)
             {
-                return;
+                if (toioList.Count(t => t.Address == args.BluetoothAddress) > 0)
+                {
+                    return;
+                }
             }
 
             var bleServiceUUIDs = args.Advertisement.ServiceUuids;
@@ -403,7 +367,6 @@ namespace ToioBridge
                             // Test
                             byte battery = toio.ReadBatteryLife();
 
-
                             lock (lockObj)
                             {
                                 toioList.Add(toio);
@@ -412,9 +375,6 @@ namespace ToioBridge
                             if (newlyFound != null)
                                 newlyFound(toio);
                         }
-                        //var services = await bluetoothLeDevice.GetGattServicesForUuidAsync(Toio.ServiceUUID);
-
-
                     });
                     task.Wait();
                 }
